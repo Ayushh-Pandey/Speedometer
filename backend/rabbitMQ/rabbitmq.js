@@ -58,9 +58,8 @@ export const connectRabbitMQ = async () => {
 export const publishToQueue = (message) => {
     // Validate channel is initialized
     if (!channel) {
-        const error = new Error('RabbitMQ channel not initialized. Call connectRabbitMQ() first.');
-        console.error(error.message);
-        throw error;
+        console.warn('RabbitMQ channel not initialized. Call connectRabbitMQ() first', message);
+        return false; // By this it will not cresh, will skip
     }
 
     try {
@@ -74,22 +73,22 @@ export const publishToQueue = (message) => {
         // Check if message was queued successfully
         if (!sent) {
             console.warn('Message could not be sent (channel buffer full)');
+            return false;
         }
+        return true;
     } catch (error) {
         console.error('Error publishing to queue:', error.message);
-        throw error;
+        return false; // By this it will not cresh, will skip
     }
 }
 
 // Function to consume messages from queue
 export const consumeFromQueue = () => {
     // Limit how many unacknowledged messages we can have
-    // This prevents overwhelming the consumer
     channel.prefetch(BATCH_SIZE * 2);
 
     
     // Process buffered messages by inserting them into database
-     
     const processBatch = async (retryCount = 0) => {
         // Prevent concurrent batch processing
         if (isProcessing) {
@@ -131,7 +130,7 @@ export const consumeFromQueue = () => {
                 channel.ack(msg);
             });
 
-            console.log(`✅ Acknowledged ${messagesToAck.length} messages`);
+            console.log(`Acknowledged ${messagesToAck.length} messages`);
 
         } catch (error) {
             // Database insert failed
