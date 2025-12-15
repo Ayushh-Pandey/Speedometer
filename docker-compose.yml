@@ -1,0 +1,55 @@
+version: "3.8"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: speedometer
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: ./backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/speedometer
+    depends_on:
+      - postgres
+      - rabbitmq
+
+  sensor:
+    build: ./sensor
+    ports:
+      - "5000:5000"
+    restart: always
+    environment:
+      BACKEND_URL: http://backend:3000
+    depends_on:
+      - backend
+  frontend:
+    build: ./frontend
+    ports:
+      - "3001:5173"
+    environment:
+      # IMPORTANT: Frontend runs in the browser (client-side), not in the container
+      # So it must connect to localhost:3000 (the host machine's exposed backend port)
+      # NOT backend:3000 (which only works inside Docker network for server-to-server calls)
+      VITE_BACKEND_URL: http://localhost:3000
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
